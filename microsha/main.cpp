@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <csignal>
+#include <pwd.h>
 
 
 std::vector<std::string> split(const std::string &str) {
@@ -39,6 +40,12 @@ auto getCurrentDirectory() {
     std::string path_string(path);
     free(path);
     return path_string;
+}
+
+auto getHomeDirectory(){
+    struct passwd *pw = getpwuid(getuid());
+    std::string homeDir(pw->pw_dir);
+    return homeDir;
 }
 
 int cd(const std::string& destinationDir) {     //returns 0 if everything is OK, 1 if error
@@ -80,6 +87,8 @@ int commandExecutor(const std::vector<std::string> &data) { // call command by n
         if (data.size() > 2) {
             fprintf(stderr, "error: too many arguments for cd\n");
             return 1;
+        } else if (data.size() == 1){
+            return cd(getHomeDirectory());
         }
         return cd(data[1]);
     } else if (data[0] == "pwd") {
@@ -94,9 +103,9 @@ int commandExecutor(const std::vector<std::string> &data) { // call command by n
     return 0;
 }
 
-void printWelcomeMessage(bool root) {
+void printWelcomeMessage(bool root, const std::string& userName) {
 
-    std::printf("[Pavlos %s]", getCurrentDirectory().c_str());
+    std::printf("[%s %s]", userName.c_str(), getCurrentDirectory().c_str());
     if (root) {
         std::printf("! ");
     } else {
@@ -105,10 +114,10 @@ void printWelcomeMessage(bool root) {
 }
 
 
-[[noreturn]] int shellLoop() {
+[[noreturn]] int shellLoop(bool isRoot, const std::string& userName) {
     while (true) {
         std::string inputBuffer;
-        printWelcomeMessage(false);
+        printWelcomeMessage(isRoot, userName);
         std::getline(std::cin, inputBuffer);
         std::vector<std::string> words = split(inputBuffer); //split input string by space and tab
         //for (const auto &word: words) printf("%s\n", word.c_str()); //print parsed data
@@ -117,6 +126,14 @@ void printWelcomeMessage(bool root) {
 }
 
 int main(int argc, char *argv[]) {
-    shellLoop();
+    struct passwd *pw = getpwuid(getuid());
+    std::string userName(pw->pw_name);
+    bool isRoot = false;
+    if (pw->pw_uid == 0){
+        isRoot = true;
+    }
+    std::string homeDir(pw->pw_dir);
+    cd(homeDir);
+    shellLoop(isRoot, userName);
     return 0;
 }
