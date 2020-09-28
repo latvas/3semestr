@@ -164,13 +164,13 @@ void printWelcomeMessage(bool root, const std::string &userName) {
     }
 }
 
-[[noreturn]] int shellLoop(bool isRoot, const std::string &userName) {
+int shellLoop(bool isRoot, const std::string &userName) {
     while (true) {
         std::string inputBuffer;
         printWelcomeMessage(isRoot, userName);
         std::getline(std::cin, inputBuffer);
-        if(inputBuffer[0] == EOF){
-            continue;
+        if(std::cin.eof()){
+            return 1;
         }
         std::vector<std::string> words = split(inputBuffer);
         if (words.empty()){
@@ -192,5 +192,6 @@ int main(int argc, char *argv[]) {
     std::string homeDir(pw->pw_dir);
     cd(homeDir);
     shellLoop(isRoot, userName);
+    printf("\nEOF: program terminated because input stream closed.\n");
     return 0;
 }
