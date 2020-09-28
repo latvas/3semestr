@@ -164,13 +164,19 @@ void printWelcomeMessage(bool root, const std::string &userName) {
     }
 }
 
-
 [[noreturn]] int shellLoop(bool isRoot, const std::string &userName) {
     while (true) {
         std::string inputBuffer;
         printWelcomeMessage(isRoot, userName);
         std::getline(std::cin, inputBuffer);
-        std::vector<std::string> words = split(inputBuffer); //split input string by space and tab
+        if(inputBuffer[0] == EOF){
+            continue;
+        }
+        std::vector<std::string> words = split(inputBuffer);
+        if (words.empty()){
+            continue;
+        }
+        //split input string by space and tab
         // for (const auto &word: words) printf("%s\n", word.c_str()); //print parsed data
         commandExecutor(words);
     }
