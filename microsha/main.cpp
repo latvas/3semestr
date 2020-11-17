@@ -9,7 +9,7 @@
 #include <csignal>
 #include <pwd.h>
 
-
+// TODO Сделать перехват сигналов, чтобы  на ctrl+С программа не закрывалась
 std::vector<std::string> split(const std::string &str) {
     std::vector<std::string> words;
     bool isPrevSpace = true;
@@ -58,9 +58,9 @@ std::vector<int> findAllStringInVector(const std::vector<std::string> &v, const 
 auto getCurrentDirectory() {
     char *path = (char *) malloc(PATH_MAX * sizeof(char)); //allocating memory
     char *res = getcwd(path, PATH_MAX);
-    std::string path_string(path);
+    std::string pathString(path);
     free(path);
-    return path_string;
+    return pathString;
 }
 
 auto getHomeDirectory() {
@@ -82,6 +82,54 @@ int cd(const std::string &destinationDir) {     //returns 0 if everything is OK,
     }
     return res;
 }
+
+std::vector<std::string> listOfFilesAndDirInDirectory(const std::string &dirName) {
+    std::vector<std::string> listOfFiles;
+    DIR *dir = opendir(dirName.c_str());
+    if (dir == nullptr) return listOfFiles;
+    for (dirent *d = readdir(dir); d != nullptr; d = readdir(dir)) {
+        if ((d->d_type == DT_REG) || (d->d_type == DT_DIR)) {
+            // printf("TYPE=%d, IS FILE=%d, NAME=%s\n", d->d_type, d->d_type==DT_REG, d->d_name);
+            listOfFiles.emplace_back(d->d_name);
+        }
+    }
+    return listOfFiles;
+}
+
+bool matchStrings(char const *pattern, char const *filename) {// TODO Сделать подстановку имен вместо шаблонов
+    for (; pattern[0] != '\0'; pattern++) {
+        switch (pattern[0]) {
+            case '?': {
+                if (filename[0] == '\0') {   //is empty
+                    return false;
+                }
+                filename++; //next symbol
+                break;
+            }
+            case '*': {
+                if (pattern[1] == '\0') {    //if * is the last symbol, then any expression suits us
+                    return true;
+                }
+                size_t n = strlen(filename);
+                for (int i = 0; i < n; ++i) {
+                    if (matchStrings(pattern + 1, filename + i)) {
+                        return true;
+                    }
+                }
+                return false;
+                break;
+            }
+            default:    // not * and not ?
+                //printf("%c\n", pattern[0]);
+                if (filename[0] != pattern[0]) {
+                    return false;
+                }
+                filename++;    //next symbol
+        }
+    }
+    return filename[0] == '\0';     // is string empty
+}
+
 
 int callExternalSingleCommand(std::vector<std::string> &data) {
     pid_t pid = fork();
@@ -127,7 +175,12 @@ int callExternalSingleCommand(std::vector<std::string> &data) {
     return 0;
 }
 
-int commandExecutor(std::vector<std::string> &data) { // call command by name and arguments
+int callPipeline(std::vector<std::string> &data) {
+    //TODO pipeline
+}
+
+int commandExecutor(std::vector<std::string> &data) { // call command(pipeline) by name and arguments
+    // TODO Сделать комманду SET
     if (data[0] == "cd") {   //first check if the command is internal
         if (data.size() > 2) {
             fprintf(stderr, "error: too many arguments for cd\n");
@@ -140,13 +193,13 @@ int commandExecutor(std::vector<std::string> &data) { // call command by name an
         printf("%s\n", getCurrentDirectory().c_str());
         return 0;
     } else if (data[0] == "time") {
-        printf("time\n"); // TODO Time command
+        printf("time coming soon\n"); // TODO Time command
         return 0;
     } else {    // call external command
         std::vector<int> separators = findAllStringInVector(data, "|");
-        if (separators.empty()){ //call single command
+        if (separators.empty()) { //call single command
             callExternalSingleCommand(data);
-        } else{
+        } else {
             // TODO Сделать конвейер
         }
 
@@ -154,10 +207,10 @@ int commandExecutor(std::vector<std::string> &data) { // call command by name an
     return 0;
 }
 
-void printWelcomeMessage(bool root, const std::string &userName) {
+void printWelcomeMessage(bool isRoot, const std::string &userName) {
 
     std::printf("[%s %s]", userName.c_str(), getCurrentDirectory().c_str());
-    if (root) {
+    if (isRoot) {
         std::printf("! ");
     } else {
         std::printf("> ");
@@ -168,12 +221,13 @@ int shellLoop(bool isRoot, const std::string &userName) {
     while (true) {
         std::string inputBuffer;
         printWelcomeMessage(isRoot, userName);
+        //listOfFilesInDir(getCurrentDirectory());
         std::getline(std::cin, inputBuffer);
-        if(std::cin.eof()){
+        if (std::cin.eof()) {
             return 1;
         }
         std::vector<std::string> words = split(inputBuffer);
-        if (words.empty()){
+        if (words.empty()) {
             continue;
         }
         //split input string by space and tab
